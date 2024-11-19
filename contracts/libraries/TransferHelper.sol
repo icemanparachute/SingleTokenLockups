@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '../interfaces/IStaking.sol';
 
 library TransferHelper {
   using SafeERC20 for IERC20;
@@ -14,16 +15,17 @@ library TransferHelper {
   /// @param from is the remitting address
   /// @param to is the location where they are being delivered
   function transferTokens(
-    address token,
+    IERC20 token,
     address from,
     address to,
     uint256 amount
   ) internal {
-    uint256 priorBalance = IERC20(token).balanceOf(address(to));
-    require(IERC20(token).balanceOf(from) >= amount, 'THL01');
-    SafeERC20.safeTransferFrom(IERC20(token), from, to, amount);
-    uint256 postBalance = IERC20(token).balanceOf(address(to));
-    require(postBalance - priorBalance == amount, 'THL02');
+    uint256 priorBalance = token.balanceOf(address(to));
+    require(token.balanceOf(from) >= amount, 'Insufficient balance');
+    token.safeTransferFrom(from, to, amount);
+    // SafeERC20.safeTransferFrom(IERC20(token), from, to, amount);
+    uint256 postBalance = token.balanceOf(address(to));
+    require(postBalance - priorBalance == amount, 'Transfer error');
   }
 
   /// @notice Internal function is used with standard ERC20 transfer method
@@ -32,14 +34,26 @@ library TransferHelper {
   /// @param to is the address of the recipient
   /// @param amount is the amount of tokens that are being transferred
   function withdrawTokens(
-    address token,
+    IERC20 token,
     address to,
     uint256 amount
   ) internal {
-    uint256 priorBalance = IERC20(token).balanceOf(address(to));
-    SafeERC20.safeTransfer(IERC20(token), to, amount);
-    uint256 postBalance = IERC20(token).balanceOf(address(to));
-    require(postBalance - priorBalance == amount, 'THL02');
+    uint256 priorBalance = token.balanceOf(address(to));
+    token.safeTransfer(to, amount);
+    uint256 postBalance = token.balanceOf(address(to));
+    require(postBalance - priorBalance == amount, 'Transfer error');
+  }
+
+  function stakeTokens(
+    IERC20 token,
+    address stakingContract,
+    address beneficiary,
+    uint256 amount
+  ) internal {
+    token.approve(stakingContract, amount);
+    IStaking(stakingContract).stake(amount);
+    require(token.allowance(address(this), stakingContract) == 0, 'Allowance error');
+    IStaking(stakingContract).transfer(beneficiary, amount);
   }
 
 }

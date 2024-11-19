@@ -6,7 +6,7 @@ require('@nomicfoundation/hardhat-verify');
 
 module.exports = {
   solidity: {
-    version: "0.8.27",
+    version: "0.8.28",
     settings: {
       optimizer: {
         enabled: true,
@@ -18,15 +18,15 @@ module.exports = {
   networks: {
     sepolia: {
       url: process.env.SEPOLIA_URL,
-      accounts: [process.env.DEPLOYER_PRIVATE_KEY],
+      // accounts: [process.env.DEPLOYER_PRIVATE_KEY],
     },
     holesky: {
       url: process.env.HOLESKY_URL,
-      accounts: [process.env.DEPLOYER_PRIVATE_KEY, process.env.TOKEN_DEPLOYER],
+      // accounts: [process.env.DEPLOYER_PRIVATE_KEY, process.env.TOKEN_DEPLOYER],
     },
     mainnet: {
       url: process.env.MAINNET_URL,
-      accounts: [process.env.DEPLOYER_PRIVATE_KEY, process.env.TOKEN_DEPLOYER],
+      // accounts: [process.env.DEPLOYER_PRIVATE_KEY, process.env.TOKEN_DEPLOYER],
     },
   },
   etherscan: {
