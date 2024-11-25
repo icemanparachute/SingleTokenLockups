@@ -72,15 +72,10 @@ const delegatingClaimType = {
 //   return end;
 // };
 
-// const calcPlanRate = (amount, period, end, start, originalRate, planRate) => {
-//   const numerator = BigNumber.from(period).mul(amount);
-//   let rateModCheck = BigNumber.from(originalRate).sub(planRate);
-//   let denominator = BigNumber.from(end).sub(start);
-//   if (amount.mod(rateModCheck) != 0) {
-//     denominator = denominator.sub(period);
-//   }
-//   return numerator.div(denominator);
-// }
+const calcPlanRate = (amount, periods) => {
+  const rate = (amount % periods) == 0 ? amount / periods: (amount / periods) + 1;
+  return rate;
+}
 
 module.exports = {
   ZERO: BigInt(0),
@@ -102,4 +97,5 @@ module.exports = {
   claimType,
   multiClaimType,
   delegatingClaimType,
+  calcPlanRate,
 };

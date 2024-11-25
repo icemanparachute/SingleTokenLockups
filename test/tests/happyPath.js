@@ -128,6 +128,8 @@ const happyPath = (constructorParams, lockupParams) => {
     let lock = await lockup.lockups(1);
     expect(lock.amount).to.eq(claimA);
     // expect(lock.rate).to.eq(claimA);
+    let calcRate = C.calcPlanRate(claimA, periods);
+    expect(lock.rate).to.eq(calcRate);
     expect(lock.resetTime).to.eq(0);
     if (constructorParams.start == 0) {
       expect(await lockup.startCliffSet()).to.eq(false);
@@ -165,6 +167,75 @@ const happyPath = (constructorParams, lockupParams) => {
         console.log(`reset time: ${(await lockup.lockups(1)).resetTime}`);
       }
     }
+  });
+  it('b claims and stakes and unlocks tokens', async () => {
+    let proof = getProof('./test/trees/tree.json', b.address);
+    let delegatee = b.address;
+    let expiry = BigInt(await time.latest()) + BigInt(60 * 60 * 24 * 7);
+    let nonce = 0;
+    const delegationValues = {
+      delegatee,
+      nonce,
+      expiry,
+    };
+    const delegationSignature = await getSignature(b, domain, C.delegationtype, delegationValues);
+    const delegationSig = {
+      nonce,
+      expiry,
+      v: delegationSignature.v,
+      r: delegationSignature.r,
+      s: delegationSignature.s,
+    };
+    let tx = await claimContract.connect(b).claimAndDelegate(id, proof, claimB, delegatee, delegationSig);
+    // expect that the new lockup is delegated correctly
+    let votingVault = await lockup.votingVaults('2');
+    expect(await token.balanceOf(votingVault)).to.eq(claimB);
+    expect(await token.delegates(votingVault)).to.eq(delegatee);
+    // expect taht the new lockup follows the global pattern that was established already
+    let lock = await lockup.lockups(2);
+    expect(lock.amount).to.eq(claimB);
+    let calcRate = C.calcPlanRate(claimB, periods);
+    expect(lock.rate).to.eq(calcRate);
+    expect(lock.resetTime).to.eq(start);
+    // check available unlock amount
+    let now = BigInt(await time.latest());
+    now = BigInt(await time.latest());
+    let calc = await lockup.balanceOfLockup('2', now + BigInt(1));
+    await lockup.connect(b).unlockAndStake('2');
+    expect(await staking.balanceOf(b.address)).to.eq(calc.unlockedBalance);
+  });
+  it('account C claims, delegates, and then redelegates', async () => {
+    let proof = getProof('./test/trees/tree.json', c.address);
+    let delegatee = c.address;
+    let expiry = BigInt(await time.latest()) + BigInt(60 * 60 * 24 * 7);
+    let nonce = 0;
+    const delegationValues = {
+      delegatee,
+      nonce,
+      expiry,
+    };
+    const delegationSignature = await getSignature(c, domain, C.delegationtype, delegationValues);
+    const delegationSig = {
+      nonce,
+      expiry,
+      v: delegationSignature.v,
+      r: delegationSignature.r,
+      s: delegationSignature.s,
+    };
+    let tx = await claimContract.connect(c).claimAndDelegate(id, proof, claimC, delegatee, delegationSig);
+    // expect that the new lockup is delegated correctly
+    let votingVault = await lockup.votingVaults('3');
+    expect(await token.balanceOf(votingVault)).to.eq(claimC);
+    expect(await token.delegates(votingVault)).to.eq(delegatee);
+    // expect taht the new lockup follows the global pattern that was established already
+    let lock = await lockup.lockups(3);
+    expect(lock.amount).to.eq(claimC);
+    let calcRate = C.calcPlanRate(claimC, periods);
+    expect(lock.rate).to.eq(calcRate);
+    expect(lock.resetTime).to.eq(start);
+    // c can redelegate to address A
+    await lockup.connect(c).delegate('3', a.address);
+    expect(await token.delegates(votingVault)).to.eq(a.address);
   })
 }
   
