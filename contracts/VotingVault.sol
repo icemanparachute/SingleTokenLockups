@@ -35,7 +35,8 @@ contract VotingVault {
     TransferHelper.withdrawTokens(IERC20(token), to, amount);
   }
 
-  function stakeTokens(address stakingContract, address beneficiary, uint256 amount) external onlyController {
+  function withdrawAndStake(address stakingContract, address beneficiary, uint256 amount) external onlyController {
     TransferHelper.stakeTokens(IERC20(token), stakingContract, beneficiary, amount);
   }
+
 }

@@ -102,14 +102,20 @@ contract SingleTokenLockups is ERC721Enumerable {
   ) public view returns (uint256 unlockedBalance, uint256 lockedBalance, uint256 unlockTime) {
     require(startCliffSet(), 'Start and cliff not set');
     Lockup memory lock = lockups[tokenId];
+    uint256 resetTime = lock.resetTime == 0 ? start : lock.resetTime;
     (unlockedBalance, lockedBalance, unlockTime) = TimelockLibrary.balanceAtTime(
-      start,
+      resetTime,
       cliff,
       lock.amount,
       lock.rate,
       period,
       timestamp
     );
+  }
+
+  function initialUnlock() public view returns (uint256) {
+    require(startCliffSet(), 'Start and cliff not set');
+    return TimelockLibrary.initialUnlock(start, cliff, period);
   }
 
   /****EXTERNAL CREATE METHODS**********************************************************************************************************/
@@ -171,12 +177,10 @@ contract SingleTokenLockups is ERC721Enumerable {
   }
 
   function unlockAndStake(uint256 tokenId) external onlyOwner(tokenId) {
+    require(stakingContract != address(0), 'Staking contract not set');
     (uint256 redemption, address to, address vault) = _unlock(tokenId);
-    if (vault != address(0)) {
-      VotingVault(vault).stakeTokens(stakingContract, to, redemption);
-    } else {
-      TransferHelper.stakeTokens(IERC20(token), stakingContract, to, redemption);
-    }
+    require(vault != address(0), 'vault error');
+    VotingVault(vault).withdrawAndStake(stakingContract, to, redemption);
     emit TokensStaked(tokenId, redemption, to);
   }
 
@@ -232,6 +236,7 @@ contract SingleTokenLockups is ERC721Enumerable {
     emit LockupDelegated(tokenId, delegatee, vault);
   }
 
+
   function _setupVotingVault(uint256 tokenId) internal returns (address) {
     require(votingVaults[tokenId] == address(0));
     Lockup memory lock = lockups[tokenId];
@@ -270,9 +275,31 @@ contract SingleTokenLockups is ERC721Enumerable {
     emit TransferabilityChanged(_transferable);
   }
 
-  function changeAdmin(address _admin) external onlyAdmin {
-    admin = _admin;
-    emit AdminChanged(_admin);
+  function cancelLockups(uint256[] memory tokenIds) external onlyAdmin {
+    for (uint256 i = 0; i < tokenIds.length; i++) {
+      _cancelLockup(tokenIds[i]);
+    }
+  }
+
+  function cancelAllLockups() external onlyAdmin {
+    uint256 totalSupply = totalSupply();
+    for (uint256 i = 0; i < totalSupply; i++) {
+      _cancelLockup(tokenByIndex(i));
+    }
+  }
+
+  function _cancelLockup(uint256 tokenId) internal {
+    require(ownerOf(tokenId) != address(0), 'Token does not exist');
+    require(globalLock(), 'Cannot cancel');
+    Lockup memory lock = lockups[tokenId];
+    address vault = votingVaults[tokenId];
+    if (vault != address(0)) {
+      VotingVault(vault).withdrawTokens(admin, lock.amount);
+    } else {
+      TransferHelper.withdrawTokens(IERC20(token), admin, lock.amount);
+    }
+    delete lockups[tokenId];
+    _burn(tokenId);
   }
 
   function startCliffSet() public view returns (bool) {

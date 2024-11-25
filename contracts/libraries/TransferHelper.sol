@@ -51,9 +51,9 @@ library TransferHelper {
     uint256 amount
   ) internal {
     token.approve(stakingContract, amount);
-    IStaking(stakingContract).stake(amount);
+    uint256 stakedAmount = IStaking(stakingContract).stake(amount);
     require(token.allowance(address(this), stakingContract) == 0, 'Allowance error');
-    IStaking(stakingContract).transfer(beneficiary, amount);
+    IStaking(stakingContract).transfer(beneficiary, stakedAmount);
   }
 
 }

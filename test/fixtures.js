@@ -1,7 +1,7 @@
 const { ethers } = require('hardhat');
 const C = require('./constants');
 
-module.exports = async () => {
+module.exports = async (params) => {
     const [admin, a, b, c, d, e] = await ethers.getSigners();
 
     const Token = await ethers.getContractFactory('Token');
@@ -15,7 +15,7 @@ module.exports = async () => {
     await staking.waitForDeployment();
 
     const Lockup = await ethers.getContractFactory('SingleTokenLockups');
-    const lockup = await Lockup.deploy(token.target, admin.address, true, 0, 0, 1, 'TokenLockups', 'TL');
+    const lockup = await Lockup.deploy(token.target, admin.address, params.transferable, params.start, params.cliff, params.period, 'TokenLockups', 'TL');
     await lockup.waitForDeployment();
     const claimHandler = (await ethers.getContractFactory('ClaimHandler')).attach(await lockup.claimHandler());
 

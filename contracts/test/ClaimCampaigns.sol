@@ -8,6 +8,8 @@ pragma solidity ^0.8.20;
 // OpenZeppelin Contracts (last updated v5.1.0) (utils/introspection/IERC165.sol)
 
 
+import 'hardhat/console.sol';
+
 
 /**
  * @dev Interface of the ERC-165 standard, as defined in the
@@ -5084,8 +5086,10 @@ contract ClaimCampaigns is ERC721Holder, ReentrancyGuard, EIP712, Nonces {
     uint256 rate;
     if (claimAmount % c.periods == 0) {
       rate = claimAmount / c.periods;
+      console.log('rate', rate);
     } else {
       rate = claimAmount / c.periods + 1;
+      console.log('rate', rate);
     }
     uint256 start = c.start == 0 ? block.timestamp : c.start;
     uint256 tokenId;

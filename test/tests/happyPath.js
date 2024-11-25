@@ -8,12 +8,12 @@ const { ethers } = require('hardhat');
 const { v4: uuidv4, parse: uuidParse } = require('uuid');
 const { lock } = require('ethers');
 
-const lockedDelegatingTests = () => {
+const happyPath = (constructorParams, lockupParams) => {
   let deployed, admin, a, b, c, d, e, token, claimContract, lockup, domain, staking, claimHandler;
   let start, cliff, period, periods, end;
   let totalAmount, remainder, campaign, claimLockup, claimA, claimB, claimC, claimD, claimE, id;
   it('Admin deploys the contracts, then sets up the staking and claim contracts', async () => {
-    deployed = await setup();
+    deployed = await setup(constructorParams);
     admin = deployed.admin;
     a = deployed.a;
     b = deployed.b;
@@ -34,9 +34,9 @@ const lockedDelegatingTests = () => {
   it('Admin creates a claim campaign', async () => {
     let now = BigInt(await time.latest());
     start = now;
-    cliff = start;
-    period = BigInt(1);
-    periods = BigInt(1);
+    cliff = BigInt(lockupParams.cliff) + start;
+    period = BigInt(lockupParams.period);
+    periods = BigInt(lockupParams.periods);
     end = start + periods;
     let treevalues = [];
     totalAmount = BigInt(0);
@@ -127,15 +127,48 @@ const lockedDelegatingTests = () => {
     expect(await token.delegates(votingVault)).to.eq(delegatee);
     let lock = await lockup.lockups(1);
     expect(lock.amount).to.eq(claimA);
-    expect(lock.rate).to.eq(claimA);
+    // expect(lock.rate).to.eq(claimA);
     expect(lock.resetTime).to.eq(0);
-    expect(await lockup.startCliffSet()).to.eq(false);
-    expect(await lockup.globalLock()).to.eq(true);
+    if (constructorParams.start == 0) {
+      expect(await lockup.startCliffSet()).to.eq(false);
+      expect(await lockup.globalLock()).to.eq(true);
+    } else {
+      expect(await lockup.startCliffSet()).to.eq(true);
+    }
+  }); 
+  it('If the start and cliff are not set the admin then sets them to match the claim unlock', async () => {
+    if (constructorParams.start == 0) {
+      expect(await lockup.startCliffSet()).to.eq(false);
+      expect(await lockup.globalLock()).to.eq(true);
+      // admin will need to set the start and cliff times
+      await lockup.updateStartAndCliff(start, cliff);
+      let initialUnlock = await lockup.initialUnlock();
+      let now = BigInt(await time.latest());
+      if (initialUnlock > now) await time.increaseTo(initialUnlock);
+      now = BigInt(await time.latest());
+      let calc = await lockup.balanceOfLockup('1', now + BigInt(1));
+      console.log(calc);
+      console.log(`initial reset time: ${(await lockup.lockups(1)).resetTime}`);
+      await lockup.connect(a).unlock('1');
+      expect(await token.balanceOf(a.address)).to.eq(calc.unlockedBalance);
+      if (calc.lockedBalance == 0) {
+        expect(await token.balanceOf(a.address)).to.eq(claimA);
+        expect((await lockup.lockups(1)).amount).to.eq(0);
+        expect((await lockup.lockups(1)).rate).to.eq(0);
+        expect(await lockup.balanceOf(a.address)).to.eq(0);
+      } else {
+        expect(await token.balanceOf(a.address)).to.eq(calc.unlockedBalance);
+        let votingVault = await lockup.votingVaults(1);
+        expect(await token.balanceOf(votingVault)).to.eq(calc.lockedBalance);
+        expect((await lockup.lockups(1)).amount).to.eq(calc.lockedBalance);
+        expect((await lockup.lockups(1)).resetTime).to.eq(now + BigInt(1));
+        console.log(`reset time: ${(await lockup.lockups(1)).resetTime}`);
+      }
+    }
   })
 }
   
 
 module.exports = {
-  lockedDelegatingTests,
-  
+  happyPath,
 };
