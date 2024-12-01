@@ -12,6 +12,7 @@ const happyPath = (constructorParams, lockupParams) => {
   let deployed, admin, a, b, c, d, e, token, claimContract, lockup, domain, staking, claimHandler;
   let start, cliff, period, periods, end;
   let totalAmount, remainder, campaign, claimLockup, claimA, claimB, claimC, claimD, claimE, id;
+  // console.log(`testing for the ${constructorParams.name} constructor settings with the ${lockupParams.name} lockup settings`);
   it('Admin deploys the contracts, then sets up the staking and claim contracts', async () => {
     deployed = await setup(constructorParams);
     admin = deployed.admin;
@@ -73,7 +74,7 @@ const happyPath = (constructorParams, lockupParams) => {
       token: token.target,
       amount: totalAmount,
       start: now,
-      end: BigInt((await time.latest()) + 60 * 60),
+      end: BigInt((await time.latest()) + (60 * 60 * 24 * 365)),
       tokenLockup: 1,
       root,
       delegating: true,
@@ -130,11 +131,12 @@ const happyPath = (constructorParams, lockupParams) => {
     // expect(lock.rate).to.eq(claimA);
     let calcRate = C.calcPlanRate(claimA, periods);
     expect(lock.rate).to.eq(calcRate);
-    expect(lock.resetTime).to.eq(0);
     if (constructorParams.start == 0) {
+      expect(lock.resetTime).to.eq(0);
       expect(await lockup.startCliffSet()).to.eq(false);
       expect(await lockup.globalLock()).to.eq(true);
     } else {
+      expect(lock.resetTime).to.eq(await lockup.start());
       expect(await lockup.startCliffSet()).to.eq(true);
     }
   }); 
@@ -196,11 +198,18 @@ const happyPath = (constructorParams, lockupParams) => {
     expect(lock.amount).to.eq(claimB);
     let calcRate = C.calcPlanRate(claimB, periods);
     expect(lock.rate).to.eq(calcRate);
-    expect(lock.resetTime).to.eq(start);
+    if (constructorParams.start == 0) {
+      expect(lock.resetTime).to.eq(start);
+    } else {
+      expect(lock.resetTime).to.eq(await lockup.start());
+    }
     // check available unlock amount
+    let initialUnlock = await lockup.initialUnlock();
+    if (initialUnlock > BigInt(await time.latest())) await time.increaseTo(initialUnlock + BigInt(1));
     let now = BigInt(await time.latest());
     now = BigInt(await time.latest());
     let calc = await lockup.balanceOfLockup('2', now + BigInt(1));
+    
     await lockup.connect(b).unlockAndStake('2');
     expect(await staking.balanceOf(b.address)).to.eq(calc.unlockedBalance);
   });
@@ -232,7 +241,11 @@ const happyPath = (constructorParams, lockupParams) => {
     expect(lock.amount).to.eq(claimC);
     let calcRate = C.calcPlanRate(claimC, periods);
     expect(lock.rate).to.eq(calcRate);
-    expect(lock.resetTime).to.eq(start);
+    if (constructorParams.start == 0) {
+      expect(lock.resetTime).to.eq(start);
+    } else {
+      expect(lock.resetTime).to.eq(await lockup.start());
+    }
     // c can redelegate to address A
     await lockup.connect(c).delegate('3', a.address);
     expect(await token.delegates(votingVault)).to.eq(a.address);

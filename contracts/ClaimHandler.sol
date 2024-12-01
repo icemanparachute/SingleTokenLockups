@@ -4,7 +4,7 @@
 pragma solidity 0.8.28;
 
 import './libraries/TransferHelper.sol';
-import' ./interfaces/ITokenLockups.sol';
+import './interfaces/ITokenLockups.sol';
 
 /// @title ClaimHandler
 /// @notice this is an adapter for the ClaimCampaigns.sol contract
@@ -69,17 +69,26 @@ contract ClaimHandler {
   /// this only takes in the claimAmount, and rate and stores those values in the lockup struct
   /// all other values are ignored as they are not needed for the SingleTokenLockups contract
   function createPlan(
-    address claims,
-    address token,
+    address claimer,
+    address _token,
     uint256 claimAmount,
     uint256 start,
     uint256 cliff,
     uint256 rate,
     uint256 period
   ) external onlyClaimContract returns (uint256 id) {
-    id = _incrementId();
+    require(_token == token, 'wrong token');
     TransferHelper.transferTokens(IERC20(token), msg.sender, address(this), claimAmount);
-    lockups[id] = Lockup(claimAmount, rate, address(0x0));
+    // if the claim contract address is sent - then its doing claim and delegate flow
+    if (claimer == claimContract) {
+      id = _incrementId();
+      lockups[id] = Lockup(claimAmount, rate, address(0x0));
+    } else {
+      // if a different recipient address is sent in, then we just simply create the lockup without delegation
+      IERC20(token).approve(address(tokenLockup), claimAmount);
+      tokenLockup.createLockup(claimer, claimAmount, rate);
+    }
+    
   }
 
   /// @notice this function is called by the claim contract to delegate the tokens to the delegatee
@@ -94,7 +103,7 @@ contract ClaimHandler {
   /// and now it approves the token spend to the lockup contract, and actually creates the lockup itself
   /// this will pull tokens from this address to the lockup contract, and then perform the delegation in the single contract call
   /// @dev the lockup is deleted afterwards
-  function safeTransferFrom(address claims, address claimer, uint256 id) external onlyClaimContract {
+  function safeTransferFrom(address from, address claimer, uint256 id) external onlyClaimContract {
     Lockup memory lockup = lockups[id];
     IERC20(token).approve(address(tokenLockup), lockup.amount);
     tokenLockup.createLockupWithDelegation(claimer, lockup.amount, lockup.rate, lockup.delegatee);

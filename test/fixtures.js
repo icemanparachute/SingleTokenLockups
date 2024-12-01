@@ -1,5 +1,6 @@
 const { ethers } = require('hardhat');
 const C = require('./constants');
+const { time } = require('@nomicfoundation/hardhat-network-helpers');
 
 module.exports = async (params) => {
     const [admin, a, b, c, d, e] = await ethers.getSigners();
@@ -14,8 +15,11 @@ module.exports = async (params) => {
     const staking = await Staking.deploy(token.target);
     await staking.waitForDeployment();
 
+    let now = BigInt(await time.latest());
+    let start = params.start == 0 ? 0 : now + BigInt(params.start);
+    let cliff = params.cliff == 0 ? 0 : now + BigInt(params.cliff);
     const Lockup = await ethers.getContractFactory('SingleTokenLockups');
-    const lockup = await Lockup.deploy(token.target, admin.address, params.transferable, params.start, params.cliff, params.period, 'TokenLockups', 'TL');
+    const lockup = await Lockup.deploy(token.target, admin.address, params.transferable, start, cliff, params.period, 'TokenLockups', 'TL');
     await lockup.waitForDeployment();
     const claimHandler = (await ethers.getContractFactory('ClaimHandler')).attach(await lockup.claimHandler());
 

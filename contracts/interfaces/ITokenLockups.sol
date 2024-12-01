@@ -9,4 +9,6 @@ interface ITokenLockups {
     address delegatee
   ) external returns (uint256 tokenId);
   function token() external view returns (address);
+
+  function createLockup(address recipient, uint256 amount, uint256 rate) external returns (uint256 tokenId);
 }

@@ -72,8 +72,29 @@ const delegatingClaimType = {
 //   return end;
 // };
 
+const calcPlanBalances = (start, cliff, amount, rate, period, redemptionTime) => {
+  if (start > redemptionTime || cliff > redemptionTime) {
+    return {
+      unlockedBalance: BigInt(0),
+      lockedBalance: amount,
+      resetTime: start,
+    }
+  } else {
+    let periodsElapsed = (redemptionTime - start) / period;
+    let maxAmount = periodsElapsed * rate;
+    let unlockedBalance = bigMin(maxAmount, amount);
+    let lockedBalance = amount - unlockedBalance;
+    let resetTime = start + (periodsElapsed * period);
+    return {
+      unlockedBalance,
+      lockedBalance,
+      resetTime,
+    }
+  }
+}
+
 const calcPlanRate = (amount, periods) => {
-  const rate = (amount % periods) == 0 ? amount / periods: (amount / periods) + 1;
+  const rate = (amount % periods) == 0 ? amount / periods: (amount / periods) + BigInt(1);
   return rate;
 }
 
@@ -98,4 +119,5 @@ module.exports = {
   multiClaimType,
   delegatingClaimType,
   calcPlanRate,
+  calcPlanBalances,
 };

@@ -28,6 +28,7 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   event LockupDelegated(uint256 tokenId, address delegatee, address votingVault);
   event TokensUnlocked(uint256 tokenId, uint256 unlockedAmount, uint256 remainingAmount, uint256 resetTime);
   event TokensStaked(uint256 tokenId, uint256 stakeAmount, address beneficiary);
+  event LockupCancelled(uint256 tokenId);
 
   event StartAndCliffSet(uint256 start, uint256 cliff);
   event TransferabilityChanged(bool transferable);
@@ -54,13 +55,13 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   bool public transferable;
 
   /// @notice details of the lockup schedule that all NFTs adhere to
-  /// @param start is the timestamp that the lockups start and tokens begin to unlock / vest
+  /// start is the timestamp that the lockups start and tokens begin to unlock / vest
   uint256 public start;
-  /// @param cliff is an optional parameter after the start date when tokens will unlock in a single discrete cliff time
+  /// cliff is an optional parameter after the start date when tokens will unlock in a single discrete cliff time
   /// Tokens will begin to unlock on the start time, but if the cliff is set after the start, then no tokens unlock until the cliff time,
   /// whereupon all tokens that have vested from start to cliff will unlock in a big chunk on that date
   uint256 public cliff;
-  /// @param period is the amount of time between discrete unlocks. Unlocks that are "streaming" or "linear" would use 1 here, where tokens will unlock every second
+  /// period is the amount of time between discrete unlocks. Unlocks that are "streaming" or "linear" would use 1 here, where tokens will unlock every second
   /// a period of 86400 would unlock tokens every day, 604800 would unlock tokens every week, and generally 2,628,000 would unlock tokens every month
   uint256 public period;
 
@@ -117,13 +118,13 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   /******MODIFIERS******************************************************************************************************* */
   /// @notice modifier for admin functions that only allows the admin to call the function
   modifier onlyAdmin() {
-    require(msg.sender == admin, '!NotAdmin');
+    require(msg.sender == admin, '!Admin');
     _;
   }
 
   /// @notice modifier for owner functions that only allows the owner of the NFT to call the function
   modifier onlyOwner(uint256 tokenId) {
-    require(ownerOf(tokenId) == msg.sender, '!NotOwner');
+    require(ownerOf(tokenId) == msg.sender, '!Owner');
     _;
   }
 
@@ -196,7 +197,7 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   ) external nonReentrant returns (uint256[] memory tokenIds) {
     require(recipients.length == amounts.length && amounts.length == rates.length, 'Array lengths must match');
     tokenIds = new uint256[](recipients.length);
-    for (uint256 i = 0; i < recipients.length; i++) {
+    for (uint256 i; i < recipients.length; i++) {
       tokenIds[i] = _createLockup(recipients[i], amounts[i], rates[i]);
     }
   }
@@ -241,7 +242,7 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
     );
     tokenIds = new uint256[](recipients.length);
     vaults = new address[](recipients.length);
-    for (uint256 i = 0; i < recipients.length; i++) {
+    for (uint256 i; i < recipients.length; i++) {
       tokenIds[i] = _createLockup(recipients[i], amounts[i], rates[i]);
       vaults[i] = _delegate(tokenIds[i], delegatees[i]);
     }
@@ -417,7 +418,8 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   /// @param tokenIds is the array of NFT token IDs that are being cancelled
   /// @dev this could be useful in case recipients are unable to unlock their tokens or for other reasons
   function cancelLockups(uint256[] memory tokenIds) external onlyAdmin {
-    for (uint256 i = 0; i < tokenIds.length; i++) {
+    require(globalLock(), 'Cannot cancel');
+    for (uint256 i; i < tokenIds.length; i++) {
       _cancelLockup(tokenIds[i]);
     }
   }
@@ -427,8 +429,8 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   function cancelAllLockups() external onlyAdmin {
     require(globalLock(), 'Cannot cancel');
     uint256 totalSupply = totalSupply();
-    for (uint256 i = 0; i < totalSupply; i++) {
-      _cancelLockup(tokenByIndex(i));
+    for (uint256 i; i < totalSupply; i++) {
+      _cancelLockup(tokenByIndex(0));
     }
   }
 
@@ -447,6 +449,7 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
     }
     delete lockups[tokenId];
     _burn(tokenId);
+    emit LockupCancelled(tokenId);
   }
 
   /// @notice public function of if the start and cliff have been set - important as some other functions rely on its boolean return
@@ -464,7 +467,7 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
     if (auth == address(0)) {
         return super._update(to, tokenId, auth);   
     } else {
-        require(transferable, 'Not transferable');
+        require(transferable, '!Transferable');
         return super._update(to, tokenId, auth);
     }
   }
