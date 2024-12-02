@@ -10,8 +10,6 @@ const { lock } = require('ethers');
 
 const cancelTests = () => {
     let deployed, admin, a, b, c, d, e, token, claimContract, lockup, domain, staking, claimHandler;
-    let start, cliff, period, periods, end;
-    let totalAmount, remainder, campaign, claimLockup, claimA, claimB, claimC, claimD, claimE, id;
     it('Deploys the contracts', async () => {
       let params = {
         start: 0,

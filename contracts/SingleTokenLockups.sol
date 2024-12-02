@@ -316,7 +316,7 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   /// it intentionally returns the redemption amount, to address and vault, because if the locked balance is 0, then the NFT is burned and the vault is deleted
   /// if the lockedBalance is not 0, then it will update the reset time with the most recent unlock time, and adjust the amount to equal the locked balance
   function _unlock(uint256 tokenId) internal returns (uint256 redemption, address to, address vault) {
-    require(!globalLock(), 'Start and cliff not set');
+    require(!globalLock(), 'Locked');
     if (lockups[tokenId].resetTime == 0) {
       // check if this is the first time unlocking and the start was not set initially
       lockups[tokenId].resetTime = start;

@@ -64,14 +64,6 @@ const delegatingClaimType = {
   ]
 }
 
-// const planEnd = (start, amount, rate, period) => {
-//   const end =
-//     BigNumber.from(amount).mod(rate) == 0
-//       ? BigNumber.from(amount).div(rate).mul(period).add(start)
-//       : BigNumber.from(amount).div(rate).mul(period).add(start).add(period);
-//   return end;
-// };
-
 const calcPlanBalances = (start, cliff, amount, rate, period, redemptionTime) => {
   if (start > redemptionTime || cliff > redemptionTime) {
     return {
@@ -98,6 +90,10 @@ const calcPlanRate = (amount, periods) => {
   return rate;
 }
 
+const calcPlanEnd = (start, amount, rate, period) => {
+  return (amount % rate) == 0 ? start + (period * (amount / rate)): start + (period * (amount / rate)) + period;
+}
+
 module.exports = {
   ZERO: BigInt(0),
   ONE: BigInt(1),
@@ -120,4 +116,5 @@ module.exports = {
   delegatingClaimType,
   calcPlanRate,
   calcPlanBalances,
+  calcPlanEnd,
 };

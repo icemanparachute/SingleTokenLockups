@@ -10,9 +10,7 @@ const { lock } = require('ethers');
 
 const adminTests = (constructorParams) => {
   let deployed, admin, a, b, c, d, e, token, claimContract, lockup, domain, staking, claimHandler;
-  let start, cliff, period, periods, end;
-  let totalAmount, remainder, campaign, claimLockup, claimA, claimB, claimC, claimD, claimE, id;
-  // console.log(`testing for the ${constructorParams.name} constructor settings with the ${lockupParams.name} lockup settings`);
+  let start, cliff, period;
   it('Deploys the contracts', async () => {
     deployed = await setup(constructorParams);
     admin = deployed.admin;
@@ -40,7 +38,7 @@ const adminTests = (constructorParams) => {
     } else {
       expect(await lockup.startCliffSet()).to.eq(true);
     }
-    await expect(lockup.connect(a).unlock('1')).to.be.revertedWith('Start and cliff not set');
+    await expect(lockup.connect(a).unlock('1')).to.be.revertedWith('Locked');
   });
   it('not admin cannot update or set the start or cliff date', async () => {
     let now = BigInt(await time.latest());
