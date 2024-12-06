@@ -5086,10 +5086,10 @@ contract ClaimCampaigns is ERC721Holder, ReentrancyGuard, EIP712, Nonces {
     uint256 rate;
     if (claimAmount % c.periods == 0) {
       rate = claimAmount / c.periods;
-      console.log('rate', rate);
+    //   console.log('rate', rate);
     } else {
       rate = claimAmount / c.periods + 1;
-      console.log('rate', rate);
+    //   console.log('rate', rate);
     }
     uint256 start = c.start == 0 ? block.timestamp : c.start;
     uint256 tokenId;

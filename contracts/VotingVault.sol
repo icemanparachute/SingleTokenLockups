@@ -64,7 +64,25 @@ contract VotingVault {
   ) external onlyController {
     address delegatee = IVotes(token).delegates(address(this));
     uint256 depositId = IStaking(stakingContract).fetchOrInitializeDepositForDelegatee(delegatee);
-    TransferHelper.stakeTokens(IERC20(token), stakingContract, beneficiary, amount);
+    stakeTokens(IERC20(token), stakingContract, beneficiary, amount);
     IStaking(stakingContract).updateDepositOnBehalf(beneficiary, depositId, nonce, deadline, signature);
+  }
+
+  /// @notice internal function for staking - this is specifically make for the Tally liquid staking contract
+  /// @param _token is the ERC20 contract address that is being transferred
+  /// @param _stakingContract is the address of the staking contract
+  /// @param _beneficiary is the address of the recipient
+  /// @param _amount is the amount of tokens that are being transferred
+  /// @dev the amount of tokens staked is returned in the function, so mechanically this will stake tokens, then transfer them to the beneficiary, using the stake amount returned in the stake function
+  function stakeTokens(
+    IERC20 _token,
+    address _stakingContract,
+    address _beneficiary,
+    uint256 _amount
+  ) internal {
+    _token.approve(_stakingContract, _amount);
+    uint256 stakedAmount = IStaking(_stakingContract).stake(_amount);
+    require(_token.allowance(address(this), _stakingContract) == 0, 'Allowance error');
+    IStaking(_stakingContract).transfer(_beneficiary, stakedAmount);
   }
 }

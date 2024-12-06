@@ -1,5 +1,5 @@
 const C = require('../constants');
-const { getSignature } = require('../helpers');
+const { getSignature, getSignatureBytes } = require('../helpers');
 const setup = require('../fixtures');
 const { expect } = require('chai');
 const { time } = require('@nomicfoundation/hardhat-network-helpers');
@@ -9,10 +9,9 @@ const { v4: uuidv4, parse: uuidParse } = require('uuid');
 const { lock } = require('ethers');
 
 const happyPath = (constructorParams, lockupParams) => {
-  let deployed, admin, a, b, c, d, e, token, claimContract, lockup, domain, staking, claimHandler;
+  let deployed, admin, a, b, c, d, e, token, claimContract, lockup, domain, depositDomain, uniLst, uniStaker, claimHandler;
   let start, cliff, period, periods, end;
   let totalAmount, remainder, campaign, claimLockup, claimA, claimB, claimC, claimD, claimE, id;
-  // console.log(`testing for the ${constructorParams.name} constructor settings with the ${lockupParams.name} lockup settings`);
   it('Admin deploys the contracts, then sets up the staking and claim contracts', async () => {
     deployed = await setup(constructorParams);
     admin = deployed.admin;
@@ -25,12 +24,12 @@ const happyPath = (constructorParams, lockupParams) => {
     claimContract = deployed.claimContract;
     lockup = deployed.lockup;
     domain = deployed.claimDomain;
-    staking = deployed.staking;
+    depositDomain = deployed.depositDomain;
+    uniStaker = deployed.uniStaker;
     claimHandler = deployed.claimHandler;
-    
-    await lockup.setStakingContract(staking.target);
+    uniLst = deployed.uniLst;
+    await lockup.setStakingContract(uniLst.target);
     await lockup.setClaimContract(claimContract.target);
-    
   });
   it('Admin creates a claim campaign', async () => {
     let now = BigInt(await time.latest());
@@ -95,7 +94,6 @@ const happyPath = (constructorParams, lockupParams) => {
       admin.address,
       BigInt(treevalues.length)
     );
-    console.log('made it to here')
     expect(tx).to.emit(claimContract, 'ClaimLockupCreated').withArgs(id, claimLockup);
     expect(tx).to.emit(claimContract, 'CampaignCreated').withArgs(id, campaign, BigInt(treevalues.length));
     expect(await token.balanceOf(claimContract.target)).to.eq(totalAmount);
@@ -151,8 +149,6 @@ const happyPath = (constructorParams, lockupParams) => {
       if (initialUnlock > now) await time.increaseTo(initialUnlock);
       now = BigInt(await time.latest());
       let calc = await lockup.balanceOfLockup('1', now + BigInt(1));
-      console.log(calc);
-      console.log(`initial reset time: ${(await lockup.lockups(1)).resetTime}`);
       await lockup.connect(a).unlock('1');
       expect(await token.balanceOf(a.address)).to.eq(calc.unlockedBalance);
       if (calc.lockedBalance == 0) {
@@ -166,13 +162,12 @@ const happyPath = (constructorParams, lockupParams) => {
         expect(await token.balanceOf(votingVault)).to.eq(calc.lockedBalance);
         expect((await lockup.lockups(1)).amount).to.eq(calc.lockedBalance);
         expect((await lockup.lockups(1)).resetTime).to.eq(now + BigInt(1));
-        console.log(`reset time: ${(await lockup.lockups(1)).resetTime}`);
       }
     }
   });
   it('b claims and stakes and unlocks tokens', async () => {
     let proof = getProof('./test/trees/tree.json', b.address);
-    let delegatee = b.address;
+    let delegatee = e.address;
     let expiry = BigInt(await time.latest()) + BigInt(60 * 60 * 24 * 7);
     let nonce = 0;
     const delegationValues = {
@@ -206,12 +201,27 @@ const happyPath = (constructorParams, lockupParams) => {
     // check available unlock amount
     let initialUnlock = await lockup.initialUnlock();
     if (initialUnlock > BigInt(await time.latest())) await time.increaseTo(initialUnlock + BigInt(1));
+    await uniLst.fetchOrInitializeDepositForDelegatee(delegatee);
+    let newDepositId = await uniLst.depositForDelegatee(delegatee);
+    console.log('newDepositId', newDepositId);
     let now = BigInt(await time.latest());
     now = BigInt(await time.latest());
     let calc = await lockup.balanceOfLockup('2', now + BigInt(1));
-    
-    await lockup.connect(b).unlockAndStake('2');
-    expect(await staking.balanceOf(b.address)).to.eq(calc.unlockedBalance);
+    let deadline = BigInt(1000) + now;
+    const depositValues = {
+      account: b.address,
+      newDepositId,
+      nonce,
+      deadline,
+    }
+    const depositSignature = await getSignatureBytes(b, depositDomain, C.deplositOnBehalfType, depositValues);
+    await lockup.connect(b).unlockAndStake('2', nonce, deadline, depositSignature);
+    let surrogateAddress = await uniStaker.surrogates(delegatee);
+    console.log('surrogateAddress', surrogateAddress);
+    expect(await token.balanceOf(surrogateAddress)).to.eq(calc.unlockedBalance);
+    expect(await token.balanceOf(uniStaker.target)).to.eq(0);
+    expect(await uniLst.balanceOf(b.address)).to.eq(calc.unlockedBalance);
+    expect(await uniLst.delegateeForHolder(b.address)).to.eq(delegatee);
   });
   it('account C claims, delegates, and then redelegates', async () => {
     let proof = getProof('./test/trees/tree.json', c.address);

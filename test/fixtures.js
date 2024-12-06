@@ -3,7 +3,7 @@ const C = require('./constants');
 const { time } = require('@nomicfoundation/hardhat-network-helpers');
 
 module.exports = async (params) => {
-    const [admin, a, b, c, d, e] = await ethers.getSigners();
+    const [admin, a, b, c, d, e, defaultDelegate] = await ethers.getSigners();
 
     const Token = await ethers.getContractFactory('Token');
     const supply = BigInt(10 ** 18) * BigInt(1000000);
@@ -29,6 +29,13 @@ module.exports = async (params) => {
     const claimContract = await ClaimContract.deploy(admin.address, claimName, version, [claimHandler.target]);
     await claimContract.waitForDeployment();
 
+    const UniStaker = await ethers.getContractFactory('UniStaker');
+    const uniStaker = await UniStaker.deploy(token.target, token.target, admin.address);
+    await uniStaker.waitForDeployment();
+
+    const UniLST = await ethers.getContractFactory('UniLst');
+    const uniLst = await UniLST.deploy('UNISLT', 'UNILST', uniStaker.target, defaultDelegate.address, admin.address, 0, admin.address);
+
     const tokenDomain = {
         name: 'Token',
         version,
@@ -41,6 +48,12 @@ module.exports = async (params) => {
         chainId: await ethers.provider.getNetwork().then(n => n.chainId),
         verifyingContract: claimContract.target,
     }
+    const depositDomain = {
+        name: 'UniLst',
+        version,
+        chainId: await ethers.provider.getNetwork().then(n => n.chainId),
+        verifyingContract: uniLst.target,
+    }
     return {
         admin,
         a,
@@ -48,6 +61,7 @@ module.exports = async (params) => {
         c,
         d,
         e,
+        defaultDelegate,
         claimContract,
         token,
         staking,
@@ -55,5 +69,8 @@ module.exports = async (params) => {
         claimHandler,
         tokenDomain,
         claimDomain,
+        depositDomain,
+        uniStaker,
+        uniLst,
     }
 }

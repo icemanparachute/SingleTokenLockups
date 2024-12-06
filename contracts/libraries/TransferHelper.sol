@@ -44,23 +44,4 @@ library TransferHelper {
     require(postBalance - priorBalance == amount, 'Transfer error');
   }
 
-
-  /// @notice internal function for staking - this is specifically make for the Tally liquid staking contract
-  /// @param token is the ERC20 contract address that is being transferred
-  /// @param stakingContract is the address of the staking contract
-  /// @param beneficiary is the address of the recipient
-  /// @param amount is the amount of tokens that are being transferred
-  /// @dev the amount of tokens staked is returned in the function, so mechanically this will stake tokens, then transfer them to the beneficiary, using the stake amount returned in the stake function
-  function stakeTokens(
-    IERC20 token,
-    address stakingContract,
-    address beneficiary,
-    uint256 amount
-  ) internal {
-    token.approve(stakingContract, amount);
-    uint256 stakedAmount = IStaking(stakingContract).stake(amount);
-    require(token.allowance(address(this), stakingContract) == 0, 'Allowance error');
-    IStaking(stakingContract).transfer(beneficiary, stakedAmount);
-  }
-
 }
