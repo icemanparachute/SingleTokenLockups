@@ -64,6 +64,15 @@ const delegatingClaimType = {
   ]
 }
 
+const deplositOnBehalfType = {
+  UpdateDeposit: [
+    { name: 'account', type: 'address' },
+    { name: 'newDepositId', type: 'uint256' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'deadline', type: 'uint256' },
+  ]
+}
+
 const calcPlanBalances = (start, cliff, amount, rate, period, redemptionTime) => {
   if (start > redemptionTime || cliff > redemptionTime) {
     return {
@@ -114,6 +123,7 @@ module.exports = {
   claimType,
   multiClaimType,
   delegatingClaimType,
+  deplositOnBehalfType,
   calcPlanRate,
   calcPlanBalances,
   calcPlanEnd,

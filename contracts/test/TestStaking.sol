@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
+
 contract TestStaking {
   IERC20 public token;
 
@@ -13,6 +14,10 @@ contract TestStaking {
   }
 
   function stake(uint256 _amount) external returns (uint256) {
+    return _stake(msg.sender, _amount);
+  }
+
+  function stakeAndDelegate(uint256 _amount, address _delegatee) external returns (uint256) {
     return _stake(msg.sender, _amount);
   }
 

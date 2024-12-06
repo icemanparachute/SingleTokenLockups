@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import './libraries/TransferHelper.sol';
 import './interfaces/IVotes.sol';
 
-
 /// @title VotingVault
 /// this contract is used to hold tokens outside and segregated from the main escrow contract for native ERC20Votes support
 /// Tokens in here are controlled by the SingleTokenStaking contract only - but the onwer of the NFT dictates where tokens are delegated
@@ -28,8 +27,8 @@ contract VotingVault {
     _;
   }
 
-    /// @notice function to delegate the tokens of this address
-    /// @param delegatee the address to delegate to
+  /// @notice function to delegate the tokens of this address
+  /// @param delegatee the address to delegate to
   function delegateTokens(address delegatee) external onlyController {
     address existingDelegate = IVotes(token).delegates(address(this));
     if (existingDelegate != delegatee) {
@@ -52,10 +51,20 @@ contract VotingVault {
   /// @param beneficiary the address of the beneficiary
   /// @param amount the amount of tokens to withdraw and staked
   /// @dev only can be called by the Controller - the SingleTokenStaking contract
+  // this first has to create a deposit for delegatee to get / create the delegate depositId
   /// this function uses the transfer helper library, which is designed to work with the UnisTaker / Tally Liquid Staking contract specifically
   /// it will stake the tokens, which this contract then receives the staked tokens; then it will transfer the staked tokens to the beneficiary
-  function withdrawAndStake(address stakingContract, address beneficiary, uint256 amount) external onlyController {
+  function withdrawAndStake(
+    address stakingContract,
+    address beneficiary,
+    uint256 amount,
+    uint256 nonce,
+    uint256 deadline,
+    bytes memory signature
+  ) external onlyController {
+    address delegatee = IVotes(token).delegates(address(this));
+    uint256 depositId = IStaking(stakingContract).fetchOrInitializeDepositForDelegatee(delegatee);
     TransferHelper.stakeTokens(IERC20(token), stakingContract, beneficiary, amount);
+    IStaking(stakingContract).updateDepositOnBehalf(beneficiary, depositId, nonce, deadline, signature);
   }
-
 }

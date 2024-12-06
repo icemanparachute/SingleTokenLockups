@@ -269,11 +269,11 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   /// @dev this function cannot be called if the tokens have not been delegated and are sitting in the voting vault
   //// this is for extra security because staking requires to call an IERC20.approve() function, which is only done in the voting vault contract so that this main contract
   /// never approves any external contracts with token spend allowance
-  function unlockAndStake(uint256 tokenId) external nonReentrant onlyOwner(tokenId) {
+  function unlockAndStake(uint256 tokenId, uint256 nonce, uint256 deadline, bytes memory signature) external nonReentrant onlyOwner(tokenId) {
     require(stakingContract != address(0), 'Staking contract not set');
     (uint256 redemption, address to, address vault) = _unlock(tokenId);
     require(vault != address(0), 'vault error');
-    VotingVault(vault).withdrawAndStake(stakingContract, to, redemption);
+    VotingVault(vault).withdrawAndStake(stakingContract, to, redemption, nonce, deadline, signature);
     emit TokensStaked(tokenId, redemption, to);
   }
 
