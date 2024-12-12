@@ -1,5 +1,6 @@
-# SingleTokenLockups
-
+# SingleTokenLockups  
+Repository for the Token Lockups by Hedgey - where the escrow lockup contract is meant for usage of Only one token, and a uniform universal lockup schedule that all recipients adhere to. 
+The lockup schedule can be adjusted by an Admin, set after the deployment of the contract, and 
 
 
 ## Testing

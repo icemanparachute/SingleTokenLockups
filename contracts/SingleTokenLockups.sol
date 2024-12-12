@@ -44,6 +44,8 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   address public token;
   /// @notice admin is the address that can adjust the parameters of the lockups before the start time, transferability, set the staking contract and claim contract
   address public admin;
+  /// @notice address who deployed this contract - used to link the claim contract
+  address internal _deployer;
   /// @notice stakingContract is the address of the staking contract that the tokens can be staked to after they are unlocked
   address public stakingContract;
   /// @notice claimContract is the address of the claim campaigns contract that is used for mass airdrops to many recipients to claim locked tokens
@@ -108,6 +110,7 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
     require((_start > 0 && _cliff >= _start) || (_start == 0 && _cliff == 0), 'Start and cliff must be set together');
     token = _token;
     admin = _admin;
+    _deployer = msg.sender;
     transferable = _transferable;
     start = _start;
     cliff = _cliff;
@@ -126,6 +129,17 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   modifier onlyOwner(uint256 tokenId) {
     require(ownerOf(tokenId) == msg.sender, '!Owner');
     _;
+  }
+
+  /// @notice function to set the claim contract address by the admin
+  /// @param _claimContract is the address of the claim contract
+  /// @dev this can Only be set once - it cannot be done multiple times
+  function setClaimContract(address _claimContract) external {
+    require(msg.sender == _deployer || msg.sender == admin, '!Deployer|Admin');
+    require(claimContract == address(0), 'Claim contract already set');
+    claimContract = _claimContract;
+    claimHandler.setClaimContract(_claimContract);
+    emit ClaimContractSet(_claimContract);
   }
 
   /******BASIC NFT TOKEN FUNCTIONS************************************************************************ *********************/
@@ -271,8 +285,8 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   /// never approves any external contracts with token spend allowance
   function unlockAndStake(uint256 tokenId, uint256 nonce, uint256 deadline, bytes memory signature) external nonReentrant onlyOwner(tokenId) {
     require(stakingContract != address(0), 'Staking contract not set');
+    require(votingVaults[tokenId] != address(0), 'vault error');
     (uint256 redemption, address to, address vault) = _unlock(tokenId);
-    require(vault != address(0), 'vault error');
     VotingVault(vault).withdrawAndStake(stakingContract, to, redemption, nonce, deadline, signature);
     emit TokensStaked(tokenId, redemption, to);
   }
@@ -395,16 +409,6 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
     require(stakingContract == address(0), 'Staking contract already set');
     stakingContract = _stakingContract;
     emit StakingContractSet(_stakingContract);
-  }
-
-  /// @notice function to set the claim contract address by the admin
-  /// @param _claimContract is the address of the claim contract
-  /// @dev this can Only be set once - it cannot be done multiple times
-  function setClaimContract(address _claimContract) external onlyAdmin {
-    require(claimContract == address(0), 'Claim contract already set');
-    claimContract = _claimContract;
-    claimHandler.setClaimContract(_claimContract);
-    emit ClaimContractSet(_claimContract);
   }
 
   /// @notice function to change the transferability of the NFTs by the admin
