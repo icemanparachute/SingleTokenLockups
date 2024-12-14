@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 interface IStaking {
+  function defaultDelegatee() external view returns (address);
   function stake(uint256 amount) external returns (uint256);
   function stakeAndDelegate(uint256 amount, address delegatee) external returns (uint256);
   function transfer(address _to, uint256 _value) external returns (bool);

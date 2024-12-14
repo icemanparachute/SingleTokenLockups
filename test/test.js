@@ -148,7 +148,7 @@ const unlockParams = [
 
 describe('Testing the stakiking functions', async () => {
   unlockParams.forEach((params) => {
-    // stakingTests(params);
+    stakingTests(params);
     claimStakingTests(params, lockupParams[1]);
   });
   

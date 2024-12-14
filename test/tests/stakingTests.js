@@ -16,6 +16,7 @@ const claimStakingTests = (constructorParams, lockupParams) => {
     c,
     d,
     e,
+    defaultDelegate,
     token,
     claimContract,
     lockup,
@@ -34,6 +35,7 @@ const claimStakingTests = (constructorParams, lockupParams) => {
     c = deployed.c;
     d = deployed.d;
     e = deployed.e;
+    defaultDelegate = deployed.defaultDelegate;
     token = deployed.token;
     claimContract = deployed.claimContract;
     lockup = deployed.lockup;
@@ -238,11 +240,11 @@ const claimStakingTests = (constructorParams, lockupParams) => {
     expect(await token.balanceOf(vault)).to.eq(claimC);
     let now = BigInt(await time.latest());
     let calc = await lockup.balanceOfLockup('3', now + BigInt(1));
-    let deposidId = await uniLst.depositForDelegatee(c.address);
+    let depositId = await uniLst.depositForDelegatee(c.address);
     let deadline = BigInt(1000) + now;
     const depositValues = {
       account: c.address,
-      newDepositId: deposidId,
+      newDepositId: depositId,
       nonce: 0,
       deadline,
     };
@@ -252,12 +254,45 @@ const claimStakingTests = (constructorParams, lockupParams) => {
     await lockup.connect(c).unlockAndStake('3', 0, deadline, depositSignature);
     expect(await token.balanceOf(surrogateAddress)).to.eq(calc.unlockedBalance + preSurrogateBalance);
   });
+  it('wallet claims and delegates to the default address, then unlocks and stakes', async () => {
+    let proof = getProof('./test/trees/tree.json', d.address);
+    const bytes = ethers.encodeBytes32String('blank');
+    const delegationSig = {
+      nonce: 0,
+      expiry: 0,
+      v: 0,
+      r: bytes,
+      s: bytes,
+    };
+    let delegatee = defaultDelegate.address;
+    console.log('default delegatee', delegatee);
+    await claimContract.connect(d).claimAndDelegate(id, proof, claimD, delegatee, delegationSig);
+    let vault = await lockup.votingVaults(4);
+    expect(await token.delegates(vault)).to.eq(delegatee);
+    expect(await token.balanceOf(vault)).to.eq(claimD);
+
+    let defaultDepositId = await uniLst.DEFAULT_DEPOSIT_ID();
+    console.log('default depositId', defaultDepositId);
+    let now = BigInt(await time.latest());
+    let calc = await lockup.balanceOfLockup('4', now + BigInt(1));
+    let deadline = BigInt(1000) + now;
+    const depositValues = {
+      account: d.address,
+      newDepositId: 0,
+      nonce: 0,
+      deadline,
+    };
+    const depositSignature = await getSignatureBytes(d, depositDomain, C.deplositOnBehalfType, depositValues);
+    let surrogateAddress = await uniStaker.surrogates(delegatee);
+    let preSurrogateBalance = await token.balanceOf(surrogateAddress);
+    await lockup.connect(d).unlockAndStake('4', 0, deadline, depositSignature);
+    expect(await token.balanceOf(surrogateAddress)).to.eq(calc.unlockedBalance + preSurrogateBalance);
+  });
 };
 
 const stakingTests = (constructorParams) => {
-  let deployed, admin, a, b, c, d, e, token, claimContract, lockup, domain, uniLst, uniStaker, claimHandler;
-  let start, cliff, period, periods, end;
-  let totalAmount, remainder, campaign, claimLockup, claimA, claimB, claimC, claimD, claimE, id;
+  let deployed, admin, a, b, c, d, e, token, claimContract, lockup, depositDomain, uniLst, uniStaker;
+  let start, cliff, period;
   it('Deploys the contracts, and sets the staking contract', async () => {
     deployed = await setup(constructorParams);
     admin = deployed.admin;
@@ -269,19 +304,130 @@ const stakingTests = (constructorParams) => {
     token = deployed.token;
     claimContract = deployed.claimContract;
     lockup = deployed.lockup;
-    domain = deployed.claimDomain;
+    depositDomain = deployed.depositDomain;
     uniLst = deployed.uniLst;
     uniStaker = deployed.uniStaker;
-    claimHandler = deployed.claimHandler;
+    start = await lockup.start();
+    cliff = await lockup.cliff();
+    period = await lockup.period();
     await lockup.setStakingContract(uniLst.target);
     await lockup.setClaimContract(claimContract.target);
     expect(await lockup.stakingContract()).to.eq(uniLst.target);
+    await token.approve(lockup.target, C.E18_1000000 * BigInt(100000));
   });
-  it('admin creates a batch of lockups with delegation', async () => {});
-  it('admin creates a batch of lockups without delegation', async () => {});
-  it('recipients unlock and stake tokens', async () => {});
-  it('recipients that have not delegated cannot unlock and stake', async () => {});
-  it('recipients that delegate to 0x0 address unlock and stake, delegating to the default delegatee', async () => {});
+  it('admin creates a batch of lockups with delegation', async () => {
+    let recipients = [a.address, b.address, c.address, d.address, e.address];
+    let amountA = C.randomBigNum(1000, 10, 18);
+    let amountB = C.randomBigNum(1000, 10, 18);
+    let amountC = C.randomBigNum(1000, 10, 18);
+    let amountD = C.randomBigNum(1000, 10, 18);
+    let amountE = C.randomBigNum(1000, 10, 18);
+    let amounts = [amountA, amountB, amountC, amountD, amountE];
+    let rateA = C.randomBigNum(700, 1, 15);
+    let rateB = C.randomBigNum(700, 1, 15);
+    let rateC = C.randomBigNum(700, 1, 15);
+    let rateD = C.randomBigNum(700, 1, 15);
+    let rateE = C.randomBigNum(700, 1, 15);
+    let rates = [rateA, rateB, rateC, rateD, rateE];
+    let delegatees = [a.address, d.address, e.address, d.address, d.address];
+    await lockup.createLockupsWithDelegation(recipients, amounts, rates, delegatees);
+    let initialUnlock = await lockup.initialUnlock();
+    if (initialUnlock > BigInt(await time.latest())) {
+      await time.increaseTo(initialUnlock + BigInt(1));
+    }
+    await uniLst.fetchOrInitializeDepositForDelegatee(a.address);
+    let depositIdA = await uniLst.depositForDelegatee(a.address);
+    let now = BigInt(await time.latest());
+    let calcA = await lockup.balanceOfLockup('1', now + BigInt(1));
+    let deadline = BigInt(1000) + now;
+    let nonce = 0;
+    let depositValues = {
+      account: a.address,
+      newDepositId: depositIdA,
+      nonce,
+      deadline,
+    };
+    let depositSignature = await getSignatureBytes(a, depositDomain, C.deplositOnBehalfType, depositValues);
+    await lockup.connect(a).unlockAndStake('1', nonce, deadline, depositSignature);
+    expect(await uniLst.balanceOf(a.address)).to.eq(calcA.unlockedBalance);
+    expect(await uniLst.delegateeForHolder(a.address)).to.eq(a.address);
+    let surrogateA = await uniStaker.surrogates(a.address);
+    expect(await token.balanceOf(surrogateA)).to.eq(calcA.unlockedBalance);
+    // unlock and stake for b
+    await uniLst.fetchOrInitializeDepositForDelegatee(d.address);
+    let depositIdD = await uniLst.depositForDelegatee(d.address);
+    now = BigInt(await time.latest());
+    let calcB = await lockup.balanceOfLockup('2', now + BigInt(1));
+    depositValues = {
+      account: b.address,
+      newDepositId: depositIdD,
+      nonce,
+      deadline,
+    };
+    depositSignature = await getSignatureBytes(b, depositDomain, C.deplositOnBehalfType, depositValues);
+    await lockup.connect(b).unlockAndStake('2', nonce, deadline, depositSignature);
+    expect(await uniLst.balanceOf(b.address)).to.eq(calcB.unlockedBalance);
+    expect(await uniLst.delegateeForHolder(b.address)).to.eq(d.address);
+    let surrogateB = await uniStaker.surrogates(d.address);
+    expect(await token.balanceOf(surrogateB)).to.eq(calcB.unlockedBalance);
+    // unlock and stake for c
+    await uniLst.fetchOrInitializeDepositForDelegatee(e.address);
+    let depositIdE = await uniLst.depositForDelegatee(e.address);
+    now = BigInt(await time.latest());
+    let calcC = await lockup.balanceOfLockup('3', now + BigInt(1));
+    depositValues = {
+      account: c.address,
+      newDepositId: depositIdE,
+      nonce,
+      deadline,
+    };
+    depositSignature = await getSignatureBytes(c, depositDomain, C.deplositOnBehalfType, depositValues);
+    await lockup.connect(c).unlockAndStake('3', nonce, deadline, depositSignature);
+    expect(await uniLst.balanceOf(c.address)).to.eq(calcC.unlockedBalance);
+    expect(await uniLst.delegateeForHolder(c.address)).to.eq(e.address);
+    let surrogateC = await uniStaker.surrogates(e.address);
+    expect(await token.balanceOf(surrogateC)).to.eq(calcC.unlockedBalance);
+    // unlock and stake for d
+    await uniLst.fetchOrInitializeDepositForDelegatee(d.address);
+    let depositIdD2 = await uniLst.depositForDelegatee(d.address);
+    now = BigInt(await time.latest());
+    let calcD = await lockup.balanceOfLockup('4', now + BigInt(1));
+    depositValues = {
+      account: d.address,
+      newDepositId: depositIdD2,
+      nonce,
+      deadline,
+    };
+    depositSignature = await getSignatureBytes(d, depositDomain, C.deplositOnBehalfType, depositValues);
+    let surrogateD = await uniStaker.surrogates(d.address);
+    let preSurrogateBalance = await token.balanceOf(surrogateD);
+    await lockup.connect(d).unlockAndStake('4', nonce, deadline, depositSignature);
+    expect(await uniLst.balanceOf(d.address)).to.eq(calcD.unlockedBalance);
+    expect(await uniLst.delegateeForHolder(d.address)).to.eq(d.address);
+    expect(await token.balanceOf(surrogateD)).to.eq(calcD.unlockedBalance + preSurrogateBalance);
+    // unlock and stake for e
+    await uniLst.fetchOrInitializeDepositForDelegatee(d.address);
+    let depositIdD3 = await uniLst.depositForDelegatee(d.address);
+    now = BigInt(await time.latest());
+    let calcE = await lockup.balanceOfLockup('5', now + BigInt(1));
+    depositValues = {
+      account: e.address,
+      newDepositId: depositIdD3,
+      nonce,
+      deadline,
+    };
+    depositSignature = await getSignatureBytes(e, depositDomain, C.deplositOnBehalfType, depositValues);
+    let surrogateE = await uniStaker.surrogates(d.address);
+    preSurrogateBalance = await token.balanceOf(surrogateE);
+    await lockup.connect(e).unlockAndStake('5', nonce, deadline, depositSignature);
+    expect(await uniLst.balanceOf(e.address)).to.eq(calcE.unlockedBalance);
+    expect(await uniLst.delegateeForHolder(e.address)).to.eq(d.address);
+    expect(await token.balanceOf(surrogateE)).to.eq(calcE.unlockedBalance + preSurrogateBalance);
+  });
+  it('fails if a lockup has not delegated', async () => {
+    await lockup.createLockup(a.address, C.E18_1000, C.E18_1000);
+    await expect(lockup.connect(a).unlockAndStake('6', 0, 0, '0x')).to.be.revertedWith('vault error');
+  });
 };
 
 module.exports = {

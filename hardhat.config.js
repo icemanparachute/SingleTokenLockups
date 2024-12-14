@@ -22,7 +22,7 @@ module.exports = {
     },
     holesky: {
       url: process.env.HOLESKY_URL,
-      // accounts: [process.env.DEPLOYER_PRIVATE_KEY, process.env.TOKEN_DEPLOYER],
+      accounts: [process.env.TEST_DEPLOYER],
     },
     mainnet: {
       url: process.env.MAINNET_URL,

@@ -63,9 +63,14 @@ contract VotingVault {
     bytes memory signature
   ) external onlyController {
     address delegatee = IVotes(token).delegates(address(this));
-    uint256 depositId = IStaking(stakingContract).fetchOrInitializeDepositForDelegatee(delegatee);
-    stakeTokens(IERC20(token), stakingContract, beneficiary, amount);
-    IStaking(stakingContract).updateDepositOnBehalf(beneficiary, depositId, nonce, deadline, signature);
+    // if the delegatee is set to 0 address or the default delegatee, we don't need to initialize or update deposit on behalf
+    if (delegatee == address(0) || delegatee == IStaking(stakingContract).defaultDelegatee()) {
+      stakeTokens(IERC20(token), stakingContract, beneficiary, amount);
+    } else {
+      uint256 depositId = IStaking(stakingContract).fetchOrInitializeDepositForDelegatee(delegatee);
+      stakeTokens(IERC20(token), stakingContract, beneficiary, amount);
+      IStaking(stakingContract).updateDepositOnBehalf(beneficiary, depositId, nonce, deadline, signature);
+    }
   }
 
   /// @notice internal function for staking - this is specifically make for the Tally liquid staking contract
