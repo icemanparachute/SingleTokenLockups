@@ -163,7 +163,7 @@ const claimTests = (constructorParams, lockupParams) => {
       // test unlocking the tokens
       let rate = C.calcPlanRate(claimA, periods);
       let calc = C.calcPlanBalances(start, cliff, claimA, rate, period, now + BigInt(1));
-      await lockup.connect(a).unlockAndStake(2);
+      await lockup.connect(a).unlock(2);
     }
   });
 };

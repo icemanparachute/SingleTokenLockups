@@ -63,8 +63,10 @@ contract VotingVault {
     bytes memory signature
   ) external onlyController {
     address delegatee = IVotes(token).delegates(address(this));
-    // if the delegatee is set to 0 address or the default delegatee, we don't need to initialize or update deposit on behalf
-    if (delegatee == address(0) || delegatee == IStaking(stakingContract).defaultDelegatee()) {
+    // if the delegatee is set to 0 address or the default delegatee or if the beneficiary has already delegated to the same delegatee, then transferring the LSTs will result in the same delegatee
+    address beneDelegatee = IVotes(token).delegates(beneficiary);
+    address defaultDelegate = IStaking(stakingContract).defaultDelegatee();
+    if (delegatee == address(0) || delegatee == defaultDelegate || delegatee == beneDelegatee) {
       stakeTokens(IERC20(token), stakingContract, beneficiary, amount);
     } else {
       uint256 depositId = IStaking(stakingContract).fetchOrInitializeDepositForDelegatee(delegatee);

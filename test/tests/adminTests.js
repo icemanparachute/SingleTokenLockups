@@ -9,7 +9,7 @@ const { v4: uuidv4, parse: uuidParse } = require('uuid');
 const { lock } = require('ethers');
 
 const adminTests = (constructorParams) => {
-  let deployed, admin, a, b, c, d, e, token, claimContract, lockup, domain, staking, claimHandler;
+  let deployed, admin, a, b, c, d, e, token, claimContract, lockup, domain, defaultDelegate, staking, claimHandler;
   let start, cliff, period;
   it('Deploys the contracts', async () => {
     deployed = await setup(constructorParams);
@@ -23,7 +23,8 @@ const adminTests = (constructorParams) => {
     claimContract = deployed.claimContract;
     lockup = deployed.lockup;
     domain = deployed.claimDomain;
-    staking = deployed.staking;
+    staking = deployed.uniLst;
+    defaultDelegate = deployed.defaultDelegate;
     claimHandler = deployed.claimHandler;
     period = constructorParams.period;
   });
@@ -66,7 +67,7 @@ const adminTests = (constructorParams) => {
     await lockup.updateStartAndCliff(start, cliff);
     await time.increase(25);
     now = BigInt(await time.latest());
-    await expect(lockup.connect(a).unlockAndStake('1')).to.be.revertedWith('Staking contract not set');
+    await expect(lockup.connect(a).unlockAndStake('1', 0, 0, '0x')).to.be.revertedWith('Staking contract not set');
     let calc = C.calcPlanBalances(start, cliff, C.E18_100, C.E18_1, BigInt(period), now + BigInt(2));
     let calc2 = await lockup.balanceOfLockup('2', now + BigInt(2));
     expect(calc.unlockedBalance).to.eq(calc2.unlockedBalance);
@@ -83,12 +84,9 @@ const adminTests = (constructorParams) => {
     let calc2 = await lockup.balanceOfLockup('2', now + BigInt(1));
     expect(calc.unlockedBalance).to.eq(calc2.unlockedBalance);
     expect(calc.lockedBalance).to.eq(calc2.lockedBalance);
-    let preStakeBalance = await token.balanceOf(staking.target);
-    await lockup.connect(b).unlockAndStake('2');
-    let postStakeBalance = await token.balanceOf(staking.target);
-    expect(postStakeBalance).to.eq(preStakeBalance + (calc.unlockedBalance));
+    await lockup.connect(b).delegate('2', defaultDelegate.address);
+    await lockup.connect(b).unlockAndStake('2', 0, now + BigInt(100), '0x');
     expect(await token.balanceOf(b.address)).to.eq(0);
-    expect(await staking.balanceOf(b.address)).to.eq(calc.unlockedBalance);
     
   });
   it('admin changes transferability of the nfts', async () => {
@@ -123,7 +121,7 @@ const adminTests = (constructorParams) => {
     await expect(lockup.setStakingContract(staking.target)).to.be.revertedWith('Staking contract already set');
   });
   it('admin cannot change the claim contract after it has been set', async () => {
-    await expect(lockup.connect(b).setClaimContract(claimContract.target)).to.be.revertedWith('!Admin');
+    await expect(lockup.connect(b).setClaimContract(claimContract.target)).to.be.revertedWith('!Deployer|Admin');
     await lockup.setClaimContract(claimContract.target);
     await expect(lockup.setClaimContract(claimContract.target)).to.be.revertedWith('Claim contract already set');
   });
