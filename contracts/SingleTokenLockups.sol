@@ -105,6 +105,7 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
     string memory _name,
     string memory _symbol
   ) ERC721(_name, _symbol) {
+    require(_token != address(0), 'Token cannot be 0 address');
     require(_admin != address(0), 'Admin cannot be 0 address');
     require(_period > 0, 'Period cannot be 0');
     require((_start > 0 && _cliff >= _start) || (_start == 0 && _cliff == 0), 'Start and cliff must be set together');
@@ -312,6 +313,8 @@ contract SingleTokenLockups is ERC721Enumerable, ReentrancyGuard {
   /// then it will increment the tokenIds counter, create a new lockup struct, mint the NFT to the recipient, and emit the LockupCreated event
   function _createLockup(address recipient, uint256 amount, uint256 rate) internal returns (uint256 tokenId) {
     require(recipient != address(0), '!0address');
+    require(amount > 0, '0 amount');
+    require(rate > 0, '0 rate');
     TransferHelper.transferTokens(IERC20(token), msg.sender, address(this), amount);
     tokenId = _incrementTokenId();
     lockups[tokenId] = Lockup(amount, rate, start);

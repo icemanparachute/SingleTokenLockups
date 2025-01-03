@@ -18,7 +18,7 @@ module.exports = {
   networks: {
     sepolia: {
       url: process.env.SEPOLIA_URL,
-      // accounts: [process.env.DEPLOYER_PRIVATE_KEY],
+      accounts: [process.env.TEST_DEPLOYER],
     },
     holesky: {
       url: process.env.HOLESKY_URL,
@@ -26,7 +26,7 @@ module.exports = {
     },
     mainnet: {
       url: process.env.MAINNET_URL,
-      // accounts: [process.env.DEPLOYER_PRIVATE_KEY, process.env.TOKEN_DEPLOYER],
+      // accounts: [process.env.DEPLOYER_PRIVATE_KEY],
     },
   },
   etherscan: {

@@ -22,6 +22,7 @@ library TransferHelper {
   ) internal {
     uint256 priorBalance = token.balanceOf(address(to));
     require(token.balanceOf(from) >= amount, 'Insufficient balance');
+    require(token.allowance(from, address(this)) >= amount, 'Insufficient allowance');
     token.safeTransferFrom(from, to, amount);
     // SafeERC20.safeTransferFrom(IERC20(token), from, to, amount);
     uint256 postBalance = token.balanceOf(address(to));

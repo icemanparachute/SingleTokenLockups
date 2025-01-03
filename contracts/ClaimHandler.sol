@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 
 import './libraries/TransferHelper.sol';
 import './interfaces/ITokenLockups.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 /// @title ClaimHandler
 /// @notice this is an adapter for the ClaimCampaigns.sol contract
@@ -13,7 +14,7 @@ import './interfaces/ITokenLockups.sol';
 /// This contract is ONLY meant to be used with the sepcific type of claim campaign, and if used inappropriately it could result in loss of funds and will revert
 /// This contract is deployed when the SingleTokenLockups contract is deployed, not meant to be deployed separately on its own
 /// @dev this contract needs to be whitelisted by the ClaimsCampaign contract after deployment
-contract ClaimHandler {
+contract ClaimHandler is ReentrancyGuard {
   /// @notice the id counter for temporary storage of claim items
   uint256 internal _ids;
   /// @notice the token lockups contract
@@ -31,6 +32,7 @@ contract ClaimHandler {
     uint256 amount;
     uint256 rate;
     address delegatee;
+    uint256 txTimeStamp;
   }
 
   /// @notice the mapping of the lockups to an id
@@ -49,7 +51,7 @@ contract ClaimHandler {
     _;
   }
 
-  function setClaimContract(address _claimContract) external {
+  function setClaimContract(address _claimContract) external nonReentrant {
     require(msg.sender == address(tokenLockup));
     require(claimContract == address(0x0), 'already set');
     claimContract = _claimContract;
@@ -76,13 +78,13 @@ contract ClaimHandler {
     uint256 cliff,
     uint256 rate,
     uint256 period
-  ) external onlyClaimContract returns (uint256 id) {
+  ) external onlyClaimContract nonReentrant returns (uint256 id) {
     require(_token == token, 'wrong token');
     TransferHelper.transferTokens(IERC20(token), msg.sender, address(this), claimAmount);
     // if the claim contract address is sent - then its doing claim and delegate flow
     if (claimer == claimContract) {
       id = _incrementId();
-      lockups[id] = Lockup(claimAmount, rate, address(0x0));
+      lockups[id] = Lockup(claimAmount, rate, address(0x0), block.timestamp);
     } else {
       // if a different recipient address is sent in, then we just simply create the lockup without delegation
       IERC20(token).approve(address(tokenLockup), claimAmount);
@@ -93,7 +95,8 @@ contract ClaimHandler {
 
   /// @notice this function is called by the claim contract to delegate the tokens to the delegatee
   /// in this case we update the storage of the lockup with this delatee address, but no delegation actually occurs yet
-  function delegate(uint256 id, address delegatee) external onlyClaimContract {
+  function delegate(uint256 id, address delegatee) external nonReentrant onlyClaimContract {
+    require(lockups[id].txTimeStamp == block.timestamp, 'invalid timestamp');
     lockups[id].delegatee = delegatee;
   }
 
@@ -103,8 +106,9 @@ contract ClaimHandler {
   /// and now it approves the token spend to the lockup contract, and actually creates the lockup itself
   /// this will pull tokens from this address to the lockup contract, and then perform the delegation in the single contract call
   /// @dev the lockup is deleted afterwards
-  function safeTransferFrom(address from, address claimer, uint256 id) external onlyClaimContract {
+  function safeTransferFrom(address from, address claimer, uint256 id) external nonReentrant onlyClaimContract {
     Lockup memory lockup = lockups[id];
+    require(lockup.txTimeStamp == block.timestamp, 'invalid timestamp');
     IERC20(token).approve(address(tokenLockup), lockup.amount);
     tokenLockup.createLockupWithDelegation(claimer, lockup.amount, lockup.rate, lockup.delegatee);
     delete lockups[id];

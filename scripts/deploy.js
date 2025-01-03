@@ -2,11 +2,15 @@ const { ethers, run } = require('hardhat');
 const { setTimeout } = require('timers/promises');
 
 async function deployLockups(admin, name, symbol) {
-    const Token = await ethers.getContractFactory('Token');
-    const supply = BigInt(10 ** 18) * BigInt(1000000);
-    const token = await Token.deploy('Wowza', 'WOWZA', supply, 18);
-    await token.waitForDeployment();
-    console.log('Token:', token.target);
+    // const Token = await ethers.getContractFactory('Token');
+    // const supply = BigInt(10 ** 18) * BigInt(1000000);
+    // const token = await Token.deploy('Wowza', 'WOWZA', supply, 18);
+    // await token.waitForDeployment();
+    // console.log('Token:', token.target);
+    const token = {
+        network: 'sepolia',
+        target: '0x04Ce226c0A2cd9e987649ef9171a34d99c5D0D3e'
+    }
 
     const Lockup = await ethers.getContractFactory('SingleTokenLockups');
     const lockup = await Lockup.deploy(token.target, admin, true, 0, 0, 1, name, symbol);
