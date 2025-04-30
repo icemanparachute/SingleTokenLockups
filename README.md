@@ -29,4 +29,4 @@ Holesky address: ``
 
 ## Mainnet Deployments
 
-Deployed address: ``   
+Deployed address: `0x3b9122704A20946E9Cb49b2a8616CCC0f0d61AdB`   
